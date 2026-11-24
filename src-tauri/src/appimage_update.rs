@@ -314,7 +314,7 @@ mod tests {
 
     #[test]
     fn metadata_requires_linux_artifact_new_version_and_own_checksum() {
-        let good = json!({"version":"999.0.0", "url":"https://github.com/owner/repo/releases/download/v999/Launcher.AppImage", "sha256":"A".repeat(64)});
+        let good = json!({"version":"999.0.0", "url":"https://github.com/cyrogestor-cmyk/zbox-launcher/releases/download/v999/ZBOX.AppImage", "sha256":"A".repeat(64)});
         let offer = metadata(&good, "https://updates.example/api").unwrap();
         assert_eq!(offer.sha256, "a".repeat(64));
         assert_eq!(offer.version, "999.0.0");
