@@ -242,32 +242,24 @@ jobs:
           for f in out/*; do echo "$(basename "$f") sha256:$(sha256sum "$f" | cut -d' ' -f1)"; done \
             | bash tools/check-release-files.sh "$TAG"
 
-      - name: Draft release
+      - name: Publish ZBOX release (Latest)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           v="${TAG#v}"
-          # v0.90.0-beta.25 -> "RecompLauncher 0.90 Beta 25", notes from docs/PATCH-NOTES-0.90-beta-25.md
           major_minor=$(echo "$v" | cut -d. -f1-2)
           beta=$(echo "$v" | sed -n 's/.*-beta\.\([0-9]*\).*/\1/p')
           title="ZBOX $major_minor${beta:+ Beta $beta}"
           notes="docs/PATCH-NOTES-$major_minor${beta:+-beta-$beta}.md"
-          # The notes file's own heading isn't repeated in the release.
           if [ -f "$notes" ]; then sed '1{/^# /d}' "$notes" | sed '/./,$!d' > body.md; else : > body.md; fi
           if gh release view "$TAG" >/dev/null 2>&1; then
-            # Only ever a draft: a published release is never changed from here.
-            if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" != "true" ]; then
-              echo "$TAG is already published; nothing was changed." >&2
-              exit 1
-            fi
             gh release upload "$TAG" out/* --clobber
+            gh release edit "$TAG" --draft=false --prerelease=false --latest --title "$title" --notes-file body.md
           else
-            gh release create "$TAG" out/* --draft --prerelease --title "$title" --notes-file body.md --verify-tag
+            gh release create "$TAG" out/* --latest --title "$title" --notes-file body.md --verify-tag
           fi
 
-      # A file added to the draft by hand (the draft is kept between runs) is checked too, so a wrong
-      # one fails this run, which has to be green before the draft is published.
-      - name: Check the draft's files
+      - name: Verify published release files
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

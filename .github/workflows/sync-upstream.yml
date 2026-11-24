@@ -1,0 +1,82 @@
+name: Sync Upstream (Auto-Update ZBOX)
+
+# Runs every 6 hours (and on demand) to pull new commits from elripalda/RecompLauncher,
+# merge them into the zbox branch while preserving ZBOX branding & self-update lock,
+# and automatically trigger a new ZBOX release when the version changes.
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync with elripalda/RecompLauncher
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: zbox
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "ZBOX Bot"
+          git config user.email "zbox-bot@users.noreply.github.com"
+
+      - name: Fetch upstream RecompLauncher
+        id: fetch
+        run: |
+          git remote add upstream https://github.com/elripalda/RecompLauncher.git || true
+          git fetch upstream main
+          # Keep origin/main as a clean mirror of upstream/main
+          git push origin refs/remotes/upstream/main:refs/heads/main --force-with-lease || git push origin refs/remotes/upstream/main:refs/heads/main
+          if git merge-base --is-ancestor FETCH_HEAD HEAD; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Already up to date with upstream/main."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "New upstream commits found."
+          fi
+
+      - name: Merge upstream into zbox
+        if: steps.fetch.outputs.changed == 'true'
+        id: merge
+        run: |
+          old_ver=$(python3 -c 'import json; print(json.load(open("src-tauri/tauri.conf.json"))["version"])')
+          python3 zbox/merge-upstream.py
+          python3 zbox/generate-assets.py
+          if ! git diff --quiet; then
+            git add -A
+            git commit -m "chore(zbox): regenerate assets after upstream sync"
+          fi
+          python3 zbox/verify-brand.py
+          new_ver=$(python3 -c 'import json; print(json.load(open("src-tauri/tauri.conf.json"))["version"])')
+          echo "old_ver=$old_ver" >> "$GITHUB_OUTPUT"
+          echo "new_ver=$new_ver" >> "$GITHUB_OUTPUT"
+
+      - name: Push synced zbox branch
+        if: steps.fetch.outputs.changed == 'true'
+        run: git push origin zbox
+
+      - name: Trigger ZBOX release build for new version
+        if: steps.fetch.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_VER: ${{ steps.merge.outputs.new_ver }}
+        run: |
+          tag="v${NEW_VER}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; skipping build."
+          else
+            echo "Triggering release build for $tag..."
+            gh workflow run release.yml --ref zbox -f tag="$tag"
+          fi
