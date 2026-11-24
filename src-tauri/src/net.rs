@@ -25,7 +25,7 @@ pub const SITE: &str = "https://recomplauncher.com";
 
 /// Optional fallback GitHub repo ("owner/repo") for local ZBOX builds when ZBOX_GITHUB_REPO is not
 /// passed at compile time. GitHub Actions sets ZBOX_GITHUB_REPO=${{ github.repository }} automatically.
-pub const ZBOX_DEFAULT_REPO: &str = "";
+pub const ZBOX_DEFAULT_REPO: &str = "cyrogestor-cmyk/zbox-launcher";
 
 /// The ZBOX GitHub repository ("owner/repo") used exclusively for launcher self-updates.
 /// Explicitly rejects the upstream RecompLauncher repo so ZBOX can never self-update into upstream.

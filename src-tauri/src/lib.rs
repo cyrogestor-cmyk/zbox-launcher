@@ -11445,10 +11445,11 @@ mod tests {
     #[test]
     fn launcher_update_downloads_only_from_trusted_places() {
         let base = "http://127.0.0.1:8787/api";
-        for ok in ["https://github.com/o/r/releases/download/v1/a.exe", "http://127.0.0.1:8787/api/launcher/a.exe"] {
+        for ok in ["https://github.com/cyrogestor-cmyk/zbox-launcher/releases/download/v1/a.exe", "http://127.0.0.1:8787/api/launcher/a.exe"] {
             assert!(trusted_update_url(ok, base), "{ok}");
         }
         for bad in [
+            "https://github.com/o/r/releases/download/v1/a.exe",
             "https://recomplauncher.com/launcher/a.exe",
             "https://github.com/elripalda/RecompLauncher/releases/download/v1/a.exe",
             "http://github.com/a.exe",

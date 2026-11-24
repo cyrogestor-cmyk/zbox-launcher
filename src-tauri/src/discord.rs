@@ -70,7 +70,7 @@ fn put(client: &mut Option<(String, DiscordIpcClient)>, app_id: &str, show: Show
                 .state(if line.is_empty() { "via ZBOX" } else { line })
                 .timestamps(activity::Timestamps::new().start(*start as i64 * 1000))
                 .assets(assets)
-                .buttons(vec![activity::Button::new("Get ZBOX", "https://recomplauncher.com")])
+                .buttons(vec![activity::Button::new("Get ZBOX", "https://github.com/cyrogestor-cmyk/zbox-launcher")])
         }
         // The launcher open, no game: "Playing ZBOX" with its logo.
         Show::Launcher { start } => activity::Activity::new()
@@ -78,7 +78,7 @@ fn put(client: &mut Option<(String, DiscordIpcClient)>, app_id: &str, show: Show
             .details("In the launcher")
             .timestamps(activity::Timestamps::new().start(*start as i64 * 1000))
             .assets(activity::Assets::new().large_image(LOGO).large_text("ZBOX"))
-            .buttons(vec![activity::Button::new("Get ZBOX", "https://recomplauncher.com")]),
+            .buttons(vec![activity::Button::new("Get ZBOX", "https://github.com/cyrogestor-cmyk/zbox-launcher")]),
     };
     if c.set_activity(make()).is_err() {
         // Discord was closed and opened again: one more try.

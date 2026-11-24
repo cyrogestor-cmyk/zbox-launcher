@@ -3,8 +3,8 @@
   "publisher": "ZBOX",
   "identifier": "com.zbox.launcher",
   "scheme": "zbox",
-  "githubRepo": "",
-  "homepage": "",
+  "githubRepo": "cyrogestor-cmyk/zbox-launcher",
+  "homepage": "https://github.com/cyrogestor-cmyk/zbox-launcher",
   "description": "ZBOX: PC recomps, all in one place. Find, install, update and play PC recomps from one launcher.",
   "colors": {
     "bg": "#090B10",
