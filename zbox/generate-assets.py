@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate ZBOX SVG logos, raster PNG/ICO icons, and NSIS installer bitmaps
+"""Generate ZBOX SVG logos (ZMAX design system), raster PNG/ICO icons, and NSIS installer bitmaps
 from zbox/brand.json using only Python's standard library (zero pip deps).
 
 Usage:
@@ -27,12 +27,13 @@ def lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * max(0.0, min(1.0, t))
 
 
-def lerp_rgb(c1, c2, t):
-    return (
-        int(round(lerp(c1[0], c2[0], t))),
-        int(round(lerp(c1[1], c2[1], t))),
-        int(round(lerp(c1[2], c2[2], t))),
-    )
+def grad3(c0, c1, c2, t: float):
+    t = max(0.0, min(1.0, t))
+    if t <= 0.45:
+        u = t / 0.45
+        return (int(round(lerp(c0[0], c1[0], u))), int(round(lerp(c0[1], c1[1], u))), int(round(lerp(c0[2], c1[2], u))))
+    u = (t - 0.45) / 0.55
+    return (int(round(lerp(c1[0], c2[0], u))), int(round(lerp(c1[1], c2[1], u))), int(round(lerp(c1[2], c2[2], u))))
 
 
 def write_png(path: str, w: int, h: int, rgba: bytes) -> None:
@@ -93,27 +94,50 @@ def in_rounded_rect(x: float, y: float, x0: float, y0: float, x1: float, y1: flo
     return (x - cx) ** 2 + (y - cy) ** 2 <= r * r
 
 
-def in_z_glyph(nx: float, ny: float) -> bool:
-    """Geometric ZBOX 'Z' glyph in normalized [0, 1] x [0, 1] coordinates."""
+def in_zmax_z(nx: float, ny: float) -> bool:
+    """ZMAX signature skewed-Z with dynamic curved speed-slash cut in [0, 1] x [0, 1]."""
+    # Map normalized [0,1] into ZMAX's 100x100 mark space, then into Z local space
+    # Mark transform: translate(13 24) scale(0.5) translate(20 2) -> origin (23, 25), scale 0.5
+    mx = nx * 100.0
+    my = ny * 100.0
+    lx = (mx - 23.0) / 0.5
+    ly = (my - 25.0) / 0.5
+
+    # Speed-slash arc curve: y_cut(x) approx from (-20, 104) through (40, 62) to (132, 42)
+    t_arc = max(0.0, min(1.0, (lx + 20.0) / 152.0))
+    y_cut = 104.0 * (1 - t_arc) ** 2 + 2 * 56.0 * (1 - t_arc) * t_arc + 42.0 * t_arc ** 2
+
+    # Thin glowing swoosh ribbon inside the cut
+    if -14.0 <= lx <= 122.0 and abs(ly - (y_cut + 2.5)) <= 2.2:
+        return True
+
+    # Cutout gap across the Z
+    if abs(ly - y_cut) <= 5.5:
+        return False
+
+    # Inverse of translate(32 0) skewX(-18): x_orig = lx - 32 + tan(18 deg) * ly
+    zx = lx - 32.0 + math.tan(math.radians(18.0)) * ly
+    zy = ly
+
+    if zx < 0.0 or zx > 100.0 or zy < 0.0 or zy > 100.0:
+        return False
     # Top bar
-    if 0.20 <= nx <= 0.80 and 0.21 <= ny <= 0.34:
+    if zy <= 24.0:
         return True
     # Bottom bar
-    if 0.20 <= nx <= 0.80 and 0.66 <= ny <= 0.79:
+    if zy >= 76.0:
         return True
-    # Diagonal bar connecting top-right (0.78, 0.30) to bottom-left (0.22, 0.70)
-    if 0.22 <= ny <= 0.78:
-        t = (ny - 0.28) / (0.72 - 0.28)
-        cx = 0.74 - t * (0.74 - 0.26)
-        if abs(nx - cx) <= 0.095:
-            return True
-    return False
+    # Diagonal bar: from (58,24)-(100,24) down to (0,76)-(42,76)
+    u = (zy - 24.0) / 52.0
+    left = 58.0 * (1.0 - u)
+    right = 100.0 - 58.0 * u
+    return left <= zx <= right
 
 
 def render_icon(size: int, transparent_bg: bool = False) -> bytes:
-    bg1 = hex_rgb(C["card"])
-    bg2 = hex_rgb(C["bg"])
-    ac1 = hex_rgb(C["accent"])
+    bg = hex_rgb(C["bg"])
+    ac0 = hex_rgb(C["accent"])
+    ac1 = hex_rgb(C["accentMid"])
     ac2 = hex_rgb(C["accent2"])
     samples = 4 if size <= 128 else 2
     inv_s = 1.0 / samples
@@ -127,23 +151,28 @@ def render_icon(size: int, transparent_bg: bool = False) -> bytes:
                 ny = (py + (sy + 0.5) * inv_s) / size
                 for sx in range(samples):
                     nx = (px + (sx + 0.5) * inv_s) / size
+                    # Diagonal gradient t from bottom-left (0,1) to top-right (1,0)
+                    gt = (nx * 0.72 + (1.0 - ny) * 0.68) / 1.15
                     if transparent_bg:
-                        # Tray icon: pure accent Z + outer frame
-                        outer = in_rounded_rect(nx, ny, 0.08, 0.08, 0.92, 0.92, 0.20)
-                        inner = in_rounded_rect(nx, ny, 0.16, 0.16, 0.84, 0.84, 0.14)
-                        if (outer and not inner) or in_z_glyph(nx, ny):
-                            c = lerp_rgb(ac1, ac2, ny)
+                        if in_zmax_z(nx, ny):
+                            c = grad3(ac0, ac1, ac2, gt)
                             r_acc += c[0]
                             g_acc += c[1]
                             b_acc += c[2]
                             a_acc += 255.0
                     else:
-                        if in_rounded_rect(nx, ny, 0.04, 0.04, 0.96, 0.96, 0.22):
-                            border = not in_rounded_rect(nx, ny, 0.09, 0.09, 0.91, 0.91, 0.17)
-                            if in_z_glyph(nx, ny) or border:
-                                c = lerp_rgb(ac1, ac2, (ny - 0.15) / 0.70)
+                        if in_rounded_rect(nx, ny, 0.02, 0.02, 0.98, 0.98, 0.24):
+                            if in_zmax_z(nx, ny):
+                                c = grad3(ac0, ac1, ac2, gt)
                             else:
-                                c = lerp_rgb(bg1, bg2, ny)
+                                # Subtle ZMAX top-right radial glow on #05080F
+                                d = math.hypot((nx - 0.85) / 0.9, (ny - 0.10) / 0.9)
+                                glow = max(0.0, 1.0 - d) ** 1.6 * 0.30
+                                c = (
+                                    int(round(lerp(bg[0], ac1[0], glow))),
+                                    int(round(lerp(bg[1], ac1[1], glow))),
+                                    int(round(lerp(bg[2], ac1[2], glow))),
+                                )
                             r_acc += c[0]
                             g_acc += c[1]
                             b_acc += c[2]
@@ -158,65 +187,90 @@ def render_icon(size: int, transparent_bg: bool = False) -> bytes:
 
 
 def generate_svgs() -> None:
-    ac1, ac2, bg, card = C["accent"], C["accent2"], C["bg"], C["card"]
+    ac0, ac1, ac2, bg = C["accent"], C["accentMid"], C["accent2"], C["bg"]
 
-    mark_svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="{NAME}">
-<defs>
-  <linearGradient id="zg" x1="0" y1="24" x2="256" y2="232" gradientUnits="userSpaceOnUse">
+    defs = f"""<defs>
+  <linearGradient id="gMark" gradientUnits="userSpaceOnUse" x1="-10" y1="104" x2="128" y2="0">
+    <stop offset="0" stop-color="{ac0}"/>
+    <stop offset="0.45" stop-color="{ac1}"/>
+    <stop offset="1" stop-color="{ac2}"/>
+  </linearGradient>
+  <linearGradient id="gX" x1="0" y1="1" x2="1" y2="0">
     <stop offset="0" stop-color="{ac1}"/>
     <stop offset="1" stop-color="{ac2}"/>
   </linearGradient>
-</defs>
-<rect x="14" y="14" width="228" height="228" rx="52" fill="{card}" stroke="url(#zg)" stroke-width="14"/>
-<path fill="url(#zg)" d="M56 60H200V88L108 168H200V196H56V168L148 88H56Z"/>
+  <mask id="mCut" maskUnits="userSpaceOnUse" x="-20" y="-2" width="150" height="108">
+    <rect x="-20" y="-2" width="150" height="108" fill="#fff"/>
+    <path d="M-20 104C14 74 58 54 132 42" fill="none" stroke="#000" stroke-width="11"/>
+  </mask>
+  <radialGradient id="glow" cx="0.85" cy="0.1" r="0.9">
+    <stop offset="0" stop-color="{ac1}" stop-opacity="0.5"/>
+    <stop offset="1" stop-color="{ac1}" stop-opacity="0"/>
+  </radialGradient>
+</defs>"""
+
+    # Exact ZMAX mark geometry
+    mark_svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 100 100" role="img" aria-label="{NAME}">
+{defs}
+  <rect width="100" height="100" rx="24" fill="{bg}"/>
+  <rect width="100" height="100" rx="24" fill="url(#glow)" opacity="0.6"/>
+  <g transform="translate(13 24) scale(0.5) translate(20 2)">
+    <g mask="url(#mCut)"><path d="M0 0H100V24L42 76H100V100H0V76L58 24H0Z" transform="translate(32 0) skewX(-18)" fill="url(#gMark)"/></g>
+    <path d="M-14 100C20 72 60 54 126 43C66 58 26 76 -14 100Z" fill="url(#gMark)"/>
+  </g>
 </svg>
 """
 
-    tray_svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="{NAME}">
-<defs>
-  <linearGradient id="zg" x1="0" y1="24" x2="256" y2="232" gradientUnits="userSpaceOnUse">
-    <stop offset="0" stop-color="{ac1}"/>
-    <stop offset="1" stop-color="{ac2}"/>
-  </linearGradient>
-</defs>
-<rect x="20" y="20" width="216" height="216" rx="48" fill="none" stroke="url(#zg)" stroke-width="20"/>
-<path fill="url(#zg)" d="M58 62H198V90L110 166H198V194H58V166L146 90H58Z"/>
+    tray_svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 100 100" role="img" aria-label="{NAME}">
+{defs}
+  <g transform="translate(6 14) scale(0.64) translate(20 2)">
+    <g mask="url(#mCut)"><path d="M0 0H100V24L42 76H100V100H0V76L58 24H0Z" transform="translate(32 0) skewX(-18)" fill="url(#gMark)"/></g>
+    <path d="M-14 100C20 72 60 54 126 43C66 58 26 76 -14 100Z" fill="url(#gMark)"/>
+  </g>
 </svg>
 """
+
+    # Exact ZMAX geometric vector wordmark style: Z - B O X with skewX(-14) and signature electric-blue X slash
+    def zbox_letters(fill: str) -> str:
+        return f"""<g transform="scale(0.92) skewX(-14)">
+    <!-- Z -->
+    <path d="M0 0H72V18L25 82H72V100H0V82L47 18H0Z" transform="translate(0 0)" fill="{fill}" fill-rule="evenodd"/>
+    <!-- - -->
+    <path d="M0 42H28V58H0Z" transform="translate(82 0)" fill="{fill}"/>
+    <!-- B -->
+    <path d="M0 0H58C72 0 80 8 80 22C80 34 73 43 62 47C75 51 84 60 84 74C84 90 73 100 56 100H0ZM22 18V41H52C57 41 60 37 60 30C60 22 57 18 52 18ZM22 58V82H54C60 82 63 78 63 70C63 62 60 58 54 58Z" transform="translate(120 0)" fill="{fill}" fill-rule="evenodd"/>
+    <!-- O -->
+    <path d="M44 0C72 0 88 18 88 50C88 82 72 100 44 100C16 100 0 82 0 50C0 18 16 0 44 0ZM44 19C29 19 22 30 22 50C22 70 29 81 44 81C59 81 66 70 66 50C66 30 59 19 44 19Z" transform="translate(216 0)" fill="{fill}" fill-rule="evenodd"/>
+    <!-- X (ZMAX signature ascending electric slash) -->
+    <path d="M0 0H24L90 100H66Z" transform="translate(316 0)" fill="{fill}"/>
+    <path d="M0 100H24L112 -10H88Z" transform="translate(316 0)" fill="url(#gX)"/>
+  </g>"""
 
     def wordmark(text_fill: str) -> str:
-        return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 120" role="img" aria-label="{NAME}">
-<defs>
-  <linearGradient id="zg" x1="0" y1="10" x2="0" y2="110" gradientUnits="userSpaceOnUse">
-    <stop offset="0" stop-color="{ac1}"/>
-    <stop offset="1" stop-color="{ac2}"/>
-  </linearGradient>
-</defs>
-<text x="4" y="96" font-family="Archivo, 'Segoe UI', system-ui, sans-serif" font-weight="900" font-size="104" letter-spacing="8">
-  <tspan fill="url(#zg)">Z</tspan><tspan fill="{text_fill}">BOX</tspan>
-</text>
+        return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="-26 -16 440 120" role="img" aria-label="{NAME}">
+{defs}
+  <g transform="translate(4 6)">
+    {zbox_letters(text_fill)}
+  </g>
 </svg>
 """
 
-    logo_svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 256" role="img" aria-label="{NAME}">
-<defs>
-  <linearGradient id="zg" x1="0" y1="24" x2="256" y2="232" gradientUnits="userSpaceOnUse">
-    <stop offset="0" stop-color="{ac1}"/>
-    <stop offset="1" stop-color="{ac2}"/>
-  </linearGradient>
-</defs>
-<rect x="14" y="14" width="228" height="228" rx="52" fill="{card}" stroke="url(#zg)" stroke-width="14"/>
-<path fill="url(#zg)" d="M56 60H200V88L108 168H200V196H56V168L148 88H56Z"/>
-<text x="292" y="178" font-family="Archivo, 'Segoe UI', system-ui, sans-serif" font-weight="900" font-size="146" letter-spacing="10">
-  <tspan fill="url(#zg)">Z</tspan><tspan fill="#FFFFFF">BOX</tspan>
-</text>
+    logo_svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="240" viewBox="0 -14 640 120" role="img" aria-label="{NAME}">
+{defs}
+  <g transform="translate(0 0) scale(1) translate(20 2)">
+    <g mask="url(#mCut)"><path d="M0 0H100V24L42 76H100V100H0V76L58 24H0Z" transform="translate(32 0) skewX(-18)" fill="url(#gMark)"/></g>
+    <path d="M-14 100C20 72 60 54 126 43C66 58 26 76 -14 100Z" fill="url(#gMark)"/>
+  </g>
+  <g transform="translate(195 9)">
+    {zbox_letters("#ffffff")}
+  </g>
 </svg>
 """
 
     for rel, content in [
         ("ui/img/mark.svg", mark_svg),
-        ("ui/img/wordmark.svg", wordmark("#FFFFFF")),
-        ("ui/img/wordmark-dark.svg", wordmark("#0E1626")),
+        ("ui/img/wordmark.svg", wordmark("#ffffff")),
+        ("ui/img/wordmark-dark.svg", wordmark("#05080F")),
         ("ui/img/logo.svg", logo_svg),
         ("src-tauri/icons/icon.svg", mark_svg),
         ("src-tauri/icons/tray.svg", tray_svg),
@@ -250,10 +304,8 @@ def generate_rasters() -> None:
             cache[sz] = render_icon(sz, transparent_bg=False)
         write_png(os.path.join(icons_dir, fname), sz, sz, cache[sz])
 
-    # Tray PNG
     write_png(os.path.join(icons_dir, "tray.png"), 64, 64, render_icon(64, transparent_bg=True))
 
-    # Multi-resolution Windows ICO (16, 24, 32, 48, 64, 128, 256)
     ico_entries: list[tuple[int, bytes]] = []
     for sz in (16, 24, 32, 48, 64, 128, 256):
         rgba = cache.get(sz) or render_icon(sz, transparent_bg=False)
@@ -264,21 +316,21 @@ def generate_rasters() -> None:
         os.remove(tmp)
     write_ico(os.path.join(icons_dir, "icon.ico"), ico_entries)
 
-    # NSIS header (150x57) and sidebar (164x314) bitmaps
+    # NSIS header (150x57) and sidebar (164x314) in ZMAX obsidian + electric cyan->royal gradient bar
     bg = hex_rgb(C["bg"])
     card = hex_rgb(C["card2"])
-    ac1 = hex_rgb(C["accent"])
+    ac0 = hex_rgb(C["accent"])
+    ac1 = hex_rgb(C["accentMid"])
     ac2 = hex_rgb(C["accent2"])
 
     for fname, w, h in [("header.bmp", 150, 57), ("sidebar.bmp", 164, 314)]:
         rgb = bytearray(w * h * 3)
         for y in range(h):
             t = y / max(1, h - 1)
-            base = lerp_rgb(card, bg, t)
+            base = (int(round(lerp(card[0], bg[0], t))), int(round(lerp(card[1], bg[1], t))), int(round(lerp(card[2], bg[2], t))))
             for x in range(w):
-                # Subtle accent bar on the bottom (header) or left (sidebar)
                 if (fname == "header.bmp" and y >= h - 3) or (fname == "sidebar.bmp" and x < 4):
-                    c = lerp_rgb(ac1, ac2, x / max(1, w - 1) if fname == "header.bmp" else t)
+                    c = grad3(ac0, ac1, ac2, x / max(1, w - 1) if fname == "header.bmp" else t)
                 else:
                     c = base
                 i = (y * w + x) * 3
@@ -289,4 +341,4 @@ def generate_rasters() -> None:
 if __name__ == "__main__":
     generate_svgs()
     generate_rasters()
-    print(f"Generated ZBOX assets for '{NAME}' ({C['accent']} / {C['bg']}).")
+    print(f"Generated ZBOX (ZMAX standard) assets for '{NAME}' ({C['accent']} -> {C['accentMid']} -> {C['accent2']} on {C['bg']}).")

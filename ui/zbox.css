@@ -1,50 +1,74 @@
-/* ZBOX theme overlay — loaded after app.css and tv.css so upstream merges stay conflict-free.
-   Edit colors here (or in zbox/brand.json) to restyle the entire launcher. */
+/* ZBOX — Padrão Visual ZMAX (carregado após app.css e tv.css para manter merges limpos).
+   Paleta oficial ZMAX: fundo #05080F / OLED #000000, gradiente #00E8FF -> #0A8BFF -> #1446F0,
+   bordas rgba(226, 232, 240, 0.13) e texto branco puro #FFFFFF. */
 
 :root {
-  --bg: #090B10;
-  --bg2: #06080C;
-  --side: #07090E;
-  --card: #10131C;
-  --card2: #161A26;
-  --card3: #1E2333;
-  --ink: #F4F7FA;
-  --muted: #A6B0C0;
-  --dim: #7E8899;
-  --cyan: #22E58B;
-  --blue: #00A86B;
+  --bg: #05080F;
+  --bg2: #020408;
+  --side: #03060C;
+  --card: #0A0F1A;
+  --card2: #101726;
+  --card3: #172136;
+  --ink: #FFFFFF;
+  --muted: #CBD5E1;
+  --dim: #94A3B8;
+  --cyan: #00E8FF;
+  --blue: #0A8BFF;
+  --zmax-royal: #1446F0;
   --warn: #F5B83D;
   --bad: #FF6B6B;
-  --grad: linear-gradient(180deg, #22E58B, #00A86B);
+  --line: rgba(226, 232, 240, 0.10);
+  --line2: rgba(226, 232, 240, 0.16);
+  --line3: rgba(226, 232, 240, 0.26);
+  --fill: rgba(255, 255, 255, 0.025);
+  --fill2: rgba(255, 255, 255, 0.05);
+  --fill3: rgba(255, 255, 255, 0.095);
+  --grad: linear-gradient(135deg, #00E8FF 0%, #0A8BFF 45%, #1446F0 100%);
 }
 
 body.oled {
   --bg: #000000;
   --bg2: #000000;
   --side: #000000;
-  --card: #0B0D10;
-  --card2: #12151B;
-  --card3: #1A1E26;
+  --card: #05080F;
+  --card2: #0B101C;
+  --card3: #121A2C;
 }
 
 body.light {
-  --cyan: #0A9B5B;
-  --blue: #067A47;
-  --grad: linear-gradient(180deg, #16C775, #067A47);
+  --cyan: #0A8BFF;
+  --blue: #1446F0;
+  --grad: linear-gradient(135deg, #0A8BFF 0%, #1446F0 100%);
 }
 
+/* Botão primário no padrão ZMAX: gradiente elétrico ciano -> azul royal */
 .btn.main {
-  color: #041A10;
-  background: var(--cyan);
-  box-shadow: 0 10px 30px -10px rgba(34, 229, 139, 0.55);
+  color: #FFFFFF;
+  background: linear-gradient(135deg, #00C8FF 0%, #0A8BFF 48%, #1446F0 100%);
+  box-shadow: 0 10px 30px -10px rgba(10, 139, 255, 0.65);
 }
 
 .btn.main:hover {
-  filter: brightness(1.07);
-  box-shadow: 0 14px 34px -10px rgba(34, 229, 139, 0.72);
+  filter: brightness(1.1);
+  box-shadow: 0 14px 36px -10px rgba(0, 232, 255, 0.72);
+}
+
+.nav.on {
+  background: linear-gradient(90deg, rgba(10, 139, 255, 0.18), rgba(20, 70, 240, 0.06));
+  box-shadow: inset 0 0 0 1px rgba(0, 232, 255, 0.18);
+}
+
+.nav.on svg {
+  color: #00E8FF;
+}
+
+#brand img.mk {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
 }
 
 #brand img.wm {
-  height: 17px;
+  height: 18px;
   width: auto;
 }

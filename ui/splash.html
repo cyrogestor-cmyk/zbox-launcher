@@ -4,24 +4,22 @@
 <meta charset="utf-8">
 <title>ZBOX</title>
 <style>
-  /* ZBOX splash window: obsidian backdrop with neon emerald reveal. */
-  html,body{margin:0;height:100%;overflow:hidden;background:#090B10;cursor:default;user-select:none}
-  body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;
-    background:radial-gradient(120% 95% at 50% 115%,#0b2b1e 0%,#090B10 58%)}
-  .mark{width:112px;height:112px;filter:drop-shadow(0 10px 30px rgba(34,229,139,.28))}
-  .mark rect,.mark path{opacity:0;animation:piece .8s cubic-bezier(.2,.8,.2,1) forwards}
-  .mark rect{animation-delay:.05s}.mark path{animation-delay:.25s}
-  .word{height:26px;width:auto;opacity:0;animation:fade .7s ease .5s forwards}
-  .bar{width:180px;height:3px;border-radius:3px;background:rgba(244,247,250,.1);overflow:hidden;opacity:0;animation:fade .4s ease .75s forwards}
-  .bar i{display:block;width:40%;height:100%;border-radius:3px;background:linear-gradient(90deg,#22E58B,#00A86B);animation:run 1.15s cubic-bezier(.65,0,.35,1) .75s infinite}
-  @keyframes piece{0%{opacity:0;filter:blur(8px);transform:translateY(12px)}100%{opacity:1;filter:blur(0);transform:none}}
+  /* ZBOX splash window — Padrão visual ZMAX (#05080F + #00E8FF -> #0A8BFF -> #1446F0). */
+  html,body{margin:0;height:100%;overflow:hidden;background:#05080F;cursor:default;user-select:none}
+  body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;
+    background:radial-gradient(120% 95% at 50% 115%,rgba(10,139,255,.22) 0%,#05080F 58%)}
+  .mark{width:116px;height:116px;filter:drop-shadow(0 12px 32px rgba(10,139,255,.35));opacity:0;animation:piece .75s cubic-bezier(.2,.8,.2,1) forwards}
+  .word{height:24px;width:auto;opacity:0;animation:fade .65s ease .45s forwards}
+  .bar{width:184px;height:3px;border-radius:3px;background:rgba(226,232,240,.12);overflow:hidden;opacity:0;animation:fade .4s ease .7s forwards}
+  .bar i{display:block;width:42%;height:100%;border-radius:3px;background:linear-gradient(90deg,#00E8FF,#0A8BFF,#1446F0);animation:run 1.15s cubic-bezier(.65,0,.35,1) .7s infinite}
+  @keyframes piece{0%{opacity:0;filter:blur(8px);transform:translateY(12px)}100%{opacity:1;filter:drop-shadow(0 12px 32px rgba(10,139,255,.35));transform:none}}
   @keyframes fade{to{opacity:1}}
   @keyframes run{0%{transform:translateX(-110%)}100%{transform:translateX(260%)}}
   @media (prefers-reduced-motion:reduce){*{animation-duration:.01s!important;animation-delay:0s!important;animation-iteration-count:1!important}}
 </style>
 </head>
 <body>
-  <svg class="mark" viewBox="0 0 256 256" aria-label="ZBOX" role="img"><defs><linearGradient id="zg" x1="0" y1="24" x2="256" y2="232" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#22E58B"/><stop offset="1" stop-color="#00A86B"/></linearGradient></defs><rect x="14" y="14" width="228" height="228" rx="52" fill="#10131C" stroke="url(#zg)" stroke-width="14"/><path fill="url(#zg)" d="M56 60H200V88L108 168H200V196H56V168L148 88H56Z"/></svg>
+  <svg class="mark" viewBox="0 0 100 100" aria-label="ZBOX" role="img"><defs><linearGradient id="gMark" gradientUnits="userSpaceOnUse" x1="-10" y1="104" x2="128" y2="0"><stop offset="0" stop-color="#00E8FF"/><stop offset="0.45" stop-color="#0A8BFF"/><stop offset="1" stop-color="#1446F0"/></linearGradient><mask id="mCut" maskUnits="userSpaceOnUse" x="-20" y="-2" width="150" height="108"><rect x="-20" y="-2" width="150" height="108" fill="#fff"/><path d="M-20 104C14 74 58 54 132 42" fill="none" stroke="#000" stroke-width="11"/></mask><radialGradient id="glow" cx="0.85" cy="0.1" r="0.9"><stop offset="0" stop-color="#0A8BFF" stop-opacity="0.5"/><stop offset="1" stop-color="#0A8BFF" stop-opacity="0"/></radialGradient></defs><rect width="100" height="100" rx="24" fill="#05080F"/><rect width="100" height="100" rx="24" fill="url(#glow)" opacity="0.6"/><g transform="translate(13 24) scale(0.5) translate(20 2)"><g mask="url(#mCut)"><path d="M0 0H100V24L42 76H100V100H0V76L58 24H0Z" transform="translate(32 0) skewX(-18)" fill="url(#gMark)"/></g><path d="M-14 100C20 72 60 54 126 43C66 58 26 76 -14 100Z" fill="url(#gMark)"/></g></svg>
   <img class="word" src="img/wordmark.svg" alt="ZBOX">
   <div class="bar" aria-hidden="true"><i></i></div>
 </body>

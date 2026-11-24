@@ -1,11 +1,36 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 120" role="img" aria-label="ZBOX">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-26 -16 440 120" role="img" aria-label="ZBOX">
 <defs>
-  <linearGradient id="zg" x1="0" y1="10" x2="0" y2="110" gradientUnits="userSpaceOnUse">
-    <stop offset="0" stop-color="#22E58B"/>
-    <stop offset="1" stop-color="#00A86B"/>
+  <linearGradient id="gMark" gradientUnits="userSpaceOnUse" x1="-10" y1="104" x2="128" y2="0">
+    <stop offset="0" stop-color="#00E8FF"/>
+    <stop offset="0.45" stop-color="#0A8BFF"/>
+    <stop offset="1" stop-color="#1446F0"/>
   </linearGradient>
+  <linearGradient id="gX" x1="0" y1="1" x2="1" y2="0">
+    <stop offset="0" stop-color="#0A8BFF"/>
+    <stop offset="1" stop-color="#1446F0"/>
+  </linearGradient>
+  <mask id="mCut" maskUnits="userSpaceOnUse" x="-20" y="-2" width="150" height="108">
+    <rect x="-20" y="-2" width="150" height="108" fill="#fff"/>
+    <path d="M-20 104C14 74 58 54 132 42" fill="none" stroke="#000" stroke-width="11"/>
+  </mask>
+  <radialGradient id="glow" cx="0.85" cy="0.1" r="0.9">
+    <stop offset="0" stop-color="#0A8BFF" stop-opacity="0.5"/>
+    <stop offset="1" stop-color="#0A8BFF" stop-opacity="0"/>
+  </radialGradient>
 </defs>
-<text x="4" y="96" font-family="Archivo, 'Segoe UI', system-ui, sans-serif" font-weight="900" font-size="104" letter-spacing="8">
-  <tspan fill="url(#zg)">Z</tspan><tspan fill="#0E1626">BOX</tspan>
-</text>
+  <g transform="translate(4 6)">
+    <g transform="scale(0.92) skewX(-14)">
+    <!-- Z -->
+    <path d="M0 0H72V18L25 82H72V100H0V82L47 18H0Z" transform="translate(0 0)" fill="#05080F" fill-rule="evenodd"/>
+    <!-- - -->
+    <path d="M0 42H28V58H0Z" transform="translate(82 0)" fill="#05080F"/>
+    <!-- B -->
+    <path d="M0 0H58C72 0 80 8 80 22C80 34 73 43 62 47C75 51 84 60 84 74C84 90 73 100 56 100H0ZM22 18V41H52C57 41 60 37 60 30C60 22 57 18 52 18ZM22 58V82H54C60 82 63 78 63 70C63 62 60 58 54 58Z" transform="translate(120 0)" fill="#05080F" fill-rule="evenodd"/>
+    <!-- O -->
+    <path d="M44 0C72 0 88 18 88 50C88 82 72 100 44 100C16 100 0 82 0 50C0 18 16 0 44 0ZM44 19C29 19 22 30 22 50C22 70 29 81 44 81C59 81 66 70 66 50C66 30 59 19 44 19Z" transform="translate(216 0)" fill="#05080F" fill-rule="evenodd"/>
+    <!-- X (ZMAX signature ascending electric slash) -->
+    <path d="M0 0H24L90 100H66Z" transform="translate(316 0)" fill="#05080F"/>
+    <path d="M0 100H24L112 -10H88Z" transform="translate(316 0)" fill="url(#gX)"/>
+  </g>
+  </g>
 </svg>
