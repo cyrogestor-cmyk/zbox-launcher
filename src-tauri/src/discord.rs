@@ -58,7 +58,7 @@ fn put(client: &mut Option<(String, DiscordIpcClient)>, app_id: &str, show: Show
             let (game, recomp, cover, line) = (*game, *recomp, *cover, *line);
             // No cover (a game the player added): the launcher's logo instead.
             let assets = if cover.starts_with("https://") {
-                activity::Assets::new().large_image(cover).large_text(recomp).small_image(LOGO).small_text("RecompLauncher")
+                activity::Assets::new().large_image(cover).large_text(recomp).small_image(LOGO).small_text("ZBOX")
             } else {
                 activity::Assets::new().large_image(LOGO).large_text(recomp)
             };
@@ -67,18 +67,18 @@ fn put(client: &mut Option<(String, DiscordIpcClient)>, app_id: &str, show: Show
                 .activity_type(activity::ActivityType::Playing)
                 .status_display_type(activity::StatusDisplayType::Details)
                 .details(game)
-                .state(if line.is_empty() { "via RecompLauncher" } else { line })
+                .state(if line.is_empty() { "via ZBOX" } else { line })
                 .timestamps(activity::Timestamps::new().start(*start as i64 * 1000))
                 .assets(assets)
-                .buttons(vec![activity::Button::new("Get RecompLauncher", "https://recomplauncher.com")])
+                .buttons(vec![activity::Button::new("Get ZBOX", "https://recomplauncher.com")])
         }
-        // The launcher open, no game: "Playing RecompLauncher" with its logo.
+        // The launcher open, no game: "Playing ZBOX" with its logo.
         Show::Launcher { start } => activity::Activity::new()
             .activity_type(activity::ActivityType::Playing)
             .details("In the launcher")
             .timestamps(activity::Timestamps::new().start(*start as i64 * 1000))
-            .assets(activity::Assets::new().large_image(LOGO).large_text("RecompLauncher"))
-            .buttons(vec![activity::Button::new("Get RecompLauncher", "https://recomplauncher.com")]),
+            .assets(activity::Assets::new().large_image(LOGO).large_text("ZBOX"))
+            .buttons(vec![activity::Button::new("Get ZBOX", "https://recomplauncher.com")]),
     };
     if c.set_activity(make()).is_err() {
         // Discord was closed and opened again: one more try.

@@ -23,6 +23,45 @@ pub const THUMBS: &str = "https://recompstore.com/api/thumb.php";
 /// The website people open in their browser (download page, links). Not used for requests.
 pub const SITE: &str = "https://recomplauncher.com";
 
+/// Optional fallback GitHub repo ("owner/repo") for local ZBOX builds when ZBOX_GITHUB_REPO is not
+/// passed at compile time. GitHub Actions sets ZBOX_GITHUB_REPO=${{ github.repository }} automatically.
+pub const ZBOX_DEFAULT_REPO: &str = "";
+
+/// The ZBOX GitHub repository ("owner/repo") used exclusively for launcher self-updates.
+/// Explicitly rejects the upstream RecompLauncher repo so ZBOX can never self-update into upstream.
+pub fn zbox_update_repo() -> Option<&'static str> {
+    let raw = option_env!("ZBOX_GITHUB_REPO").unwrap_or(ZBOX_DEFAULT_REPO).trim().trim_matches('/');
+    if raw.is_empty() || raw.eq_ignore_ascii_case("elripalda/recomplauncher") {
+        return None;
+    }
+    let mut parts = raw.split('/');
+    let (Some(owner), Some(repo), None) = (parts.next(), parts.next(), parts.next()) else {
+        return None;
+    };
+    if owner.is_empty() || repo.is_empty() {
+        return None;
+    }
+    Some(raw)
+}
+
+/// URL of ZBOX's own version.json for launcher self-updates. Returns None when no ZBOX update
+/// source is configured (disabling self-update rather than ever checking recomplauncher.com).
+pub fn zbox_version_url() -> Option<String> {
+    if let Some(custom) = option_env!("ZBOX_UPDATE_URL").map(str::trim).filter(|s| s.starts_with("https://")) {
+        if !custom.to_ascii_lowercase().contains("recomplauncher.com") {
+            return Some(custom.to_string());
+        }
+    }
+    zbox_update_repo().map(|repo| format!("https://github.com/{repo}/releases/latest/download/version.json"))
+}
+
+/// Human-facing ZBOX releases page (used if manual download fallback is needed).
+pub fn zbox_release_page() -> String {
+    zbox_update_repo()
+        .map(|repo| format!("https://github.com/{repo}/releases/latest"))
+        .unwrap_or_default()
+}
+
 /// The server to ask: `API_BASE`, or RL_API for testing against a local copy of the site.
 pub fn base() -> String {
     std::env::var("RL_API").ok().filter(|s| !s.is_empty()).unwrap_or_else(|| API_BASE.into()).trim_end_matches('/').to_string()

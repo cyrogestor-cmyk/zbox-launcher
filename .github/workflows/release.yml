@@ -7,7 +7,7 @@ name: Release builds
 on:
   push:
     tags: ['v*']
-    branches: [main]
+    branches: [zbox]
     paths: ['src-tauri/tauri.conf.json']
   workflow_dispatch:
     inputs:
@@ -129,6 +129,9 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Verify ZBOX branding and update lock
+        run: python3 zbox/verify-brand.py
+
       - name: Run tests
         run: npm test -- --locked
 
@@ -146,15 +149,9 @@ jobs:
           exit 1
         env:
           APPIMAGE_EXTRACT_AND_RUN: "1"
+          ZBOX_GITHUB_REPO: ${{ github.repository }}
           # The launcher must start on a PC without the Visual C++ runtime.
           RUSTFLAGS: ${{ runner.os == 'Windows' && '-C target-feature=+crt-static' || '' }}
-
-      - name: Brand the Windows installer
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          # Tauri keeps its own NSIS; the branding script finds it and rebuilds the installer with it.
-          python tools/brand-installer.py src-tauri/target/release
 
       - name: Collect files
         shell: bash
@@ -165,7 +162,7 @@ jobs:
             Windows) cp "$b"/nsis/*-setup.exe out/ ;;
             Linux) cp "$b"/deb/*.deb "$b"/appimage/*.AppImage out/ ;;
             macOS)
-              codesign --verify --deep --strict "$b/macos/RecompLauncher.app"
+              codesign --verify --deep --strict "$b/macos/ZBOX.app"
               cp "$b"/dmg/*.dmg out/ ;;
           esac
           ls -l out
@@ -177,18 +174,9 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  arch:
-    needs: tag
-    if: needs.tag.outputs.go == 'true'
-    uses: ./.github/workflows/arch.yml
-    with:
-      ref: ${{ needs.tag.outputs.tag }}
-      artifact-name: release-Arch
-      upload: true
-
   draft:
     name: Put the files in a draft
-    needs: [tag, build, arch]
+    needs: [tag, build]
     env:
       TAG: ${{ needs.tag.outputs.tag }}
     runs-on: ubuntu-24.04
@@ -205,8 +193,41 @@ jobs:
       - name: Source zip
         run: |
           v="${TAG#v}"
-          git archive --format=zip --prefix="RecompLauncher-$v/" HEAD -o "out/RecompLauncher-$v-source.zip"
+          git archive --format=zip --prefix="ZBOX-$v/" HEAD -o "out/ZBOX-$v-source.zip"
           ls -l out
+
+      - name: Generate ZBOX version.json for self-updates
+        run: |
+          python3 - <<'PY'
+          import glob, hashlib, json, os
+          tag = os.environ["TAG"]
+          repo = os.environ["GITHUB_REPOSITORY"]
+          ver = tag.lstrip("v")
+          base = f"https://github.com/{repo}/releases/download/{tag}"
+          def info(pattern):
+              hits = sorted(glob.glob(os.path.join("out", pattern)))
+              if not hits:
+                  return None
+              p = hits[0]
+              data = open(p, "rb").read()
+              return {
+                  "url": f"{base}/{os.path.basename(p)}",
+                  "sha256": hashlib.sha256(data).hexdigest(),
+                  "size": len(data),
+              }
+          win = info("*-setup.exe")
+          lin = info("*.AppImage")
+          mac = info("*.dmg")
+          doc = {"version": ver}
+          if win:
+              doc.update(win)
+          if lin:
+              doc["linux"] = {"version": ver, **lin}
+          if mac:
+              doc["macos"] = {"version": ver, "arch": "arm64", **mac}
+          open("out/version.json", "w", encoding="utf-8").write(json.dumps(doc, indent=2) + "\n")
+          print(open("out/version.json").read())
+          PY
 
       # Nothing is uploaded unless every built file is this tag's version and the app itself says so.
       - name: Check the built files
@@ -229,7 +250,7 @@ jobs:
           # v0.90.0-beta.25 -> "RecompLauncher 0.90 Beta 25", notes from docs/PATCH-NOTES-0.90-beta-25.md
           major_minor=$(echo "$v" | cut -d. -f1-2)
           beta=$(echo "$v" | sed -n 's/.*-beta\.\([0-9]*\).*/\1/p')
-          title="RecompLauncher $major_minor${beta:+ Beta $beta}"
+          title="ZBOX $major_minor${beta:+ Beta $beta}"
           notes="docs/PATCH-NOTES-$major_minor${beta:+-beta-$beta}.md"
           # The notes file's own heading isn't repeated in the release.
           if [ -f "$notes" ]; then sed '1{/^# /d}' "$notes" | sed '/./,$!d' > body.md; else : > body.md; fi

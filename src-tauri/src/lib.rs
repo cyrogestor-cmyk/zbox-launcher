@@ -7636,7 +7636,9 @@ pub(crate) async fn version_json(st: &App, max_age: u64, player: bool) -> Option
             return Some(v);
         }
     }
-    let url = format!("{}/launcher/version.json", catalog::base());
+    let Some(url) = net::zbox_version_url() else {
+        return None;
+    };
     match net::send(st.http.get(&url).timeout(net::QUICK), &url, player).await {
         Ok(r) if r.status().is_success() => match r.json::<Value>().await {
             Ok(v) if v.is_object() => {
@@ -8536,12 +8538,20 @@ async fn beta_feedback(st: State<'_, App>, kind: String, area: String, mood: Opt
     }
 }
 
-/// A launcher download the updater may fetch: HTTPS from GitHub or recomplauncher.com, or from the
-/// update server itself (`base`, which RL_API can point at a local http copy of the site for
-/// testing). Matched by origin and path, so github.com.evil.example or a sibling path doesn't pass.
+/// A launcher download the ZBOX updater may fetch: locked strictly to ZBOX's own GitHub repo
+/// (or a local RL_API test server). Never trusts recomplauncher.com or upstream elripalda/RecompLauncher,
+/// so an update can never revert ZBOX back into RecompLauncher.
 pub(crate) fn trusted_update_url(raw: &str, base: &str) -> bool {
     let Ok(url) = reqwest::Url::parse(raw) else { return false };
     if !url.username().is_empty() || url.password().is_some() || url.fragment().is_some() {
+        return false;
+    }
+    let host_lc = url.host_str().unwrap_or("").to_ascii_lowercase();
+    let path_lc = url.path().to_ascii_lowercase();
+    if host_lc == "recomplauncher.com" || host_lc.ends_with(".recomplauncher.com") {
+        return false;
+    }
+    if host_lc == "github.com" && path_lc.starts_with("/elripalda/recomplauncher/") {
         return false;
     }
     let under = |origin: &str| {
@@ -8549,7 +8559,16 @@ pub(crate) fn trusted_update_url(raw: &str, base: &str) -> bool {
         let prefix = format!("{}/", origin.path().trim_end_matches('/'));
         url.origin() == origin.origin() && url.path().starts_with(&prefix)
     };
-    ["https://github.com", net::SITE, base].into_iter().any(under)
+    let zbox_prefix = net::zbox_update_repo().map(|r| format!("https://github.com/{r}/releases/download"));
+    if let Some(ref zp) = zbox_prefix {
+        if under(zp) {
+            return true;
+        }
+    } else if under("https://github.com") {
+        return true;
+    }
+    // Allow explicit local test server (RL_API) only when it is not recomplauncher.com.
+    !base.to_ascii_lowercase().contains("recomplauncher.com") && under(base)
 }
 
 /// Download the newer launcher, check it, and start it: the installer on Windows, the AppImage in
@@ -8571,8 +8590,8 @@ async fn update_launcher_inner(app: &AppHandle, st: &App, _big_picture: Option<b
     if nix_managed() {
         return Err(Error::Msg("RecompLauncher updates through Nix. Update the flake input (nix flake update) or nixpkgs, then rebuild.".into()));
     }
-    let v = version_json(&st, 600, true).await.ok_or_else(|| Error::Net("Can't reach recomplauncher.com right now. Try again in a bit.".into()))?;
-    let page = format!("{}/download", net::SITE);
+    let v = version_json(&st, 600, true).await.ok_or_else(|| Error::Net("Can't reach the ZBOX update server right now. Try again in a bit.".into()))?;
+    let page = net::zbox_release_page();
     // On Linux an AppImage replaces itself; anything else (a .deb) opens the download page.
     let v = launcher_platform_entry(&v, assets::os_now(), assets::arch_now()).unwrap_or(Value::Null);
     #[cfg(target_os = "linux")]
@@ -11426,10 +11445,19 @@ mod tests {
     #[test]
     fn launcher_update_downloads_only_from_trusted_places() {
         let base = "http://127.0.0.1:8787/api";
-        for ok in ["https://github.com/o/r/releases/download/v1/a.exe", "https://recomplauncher.com/launcher/a.exe", "http://127.0.0.1:8787/api/launcher/a.exe"] {
+        for ok in ["https://github.com/o/r/releases/download/v1/a.exe", "http://127.0.0.1:8787/api/launcher/a.exe"] {
             assert!(trusted_update_url(ok, base), "{ok}");
         }
-        for bad in ["http://github.com/a.exe", "https://github.com.evil.example/a.exe", "https://name@github.com/a.exe", "https://github.com/a.exe#x", "http://127.0.0.1:8787/api-evil/a.exe", "not a url"] {
+        for bad in [
+            "https://recomplauncher.com/launcher/a.exe",
+            "https://github.com/elripalda/RecompLauncher/releases/download/v1/a.exe",
+            "http://github.com/a.exe",
+            "https://github.com.evil.example/a.exe",
+            "https://name@github.com/a.exe",
+            "https://github.com/a.exe#x",
+            "http://127.0.0.1:8787/api-evil/a.exe",
+            "not a url",
+        ] {
             assert!(!trusted_update_url(bad, base), "{bad}");
         }
     }

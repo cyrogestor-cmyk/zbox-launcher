@@ -1,0 +1,50 @@
+/* ZBOX theme overlay — loaded after app.css and tv.css so upstream merges stay conflict-free.
+   Edit colors here (or in zbox/brand.json) to restyle the entire launcher. */
+
+:root {
+  --bg: #090B10;
+  --bg2: #06080C;
+  --side: #07090E;
+  --card: #10131C;
+  --card2: #161A26;
+  --card3: #1E2333;
+  --ink: #F4F7FA;
+  --muted: #A6B0C0;
+  --dim: #7E8899;
+  --cyan: #22E58B;
+  --blue: #00A86B;
+  --warn: #F5B83D;
+  --bad: #FF6B6B;
+  --grad: linear-gradient(180deg, #22E58B, #00A86B);
+}
+
+body.oled {
+  --bg: #000000;
+  --bg2: #000000;
+  --side: #000000;
+  --card: #0B0D10;
+  --card2: #12151B;
+  --card3: #1A1E26;
+}
+
+body.light {
+  --cyan: #0A9B5B;
+  --blue: #067A47;
+  --grad: linear-gradient(180deg, #16C775, #067A47);
+}
+
+.btn.main {
+  color: #041A10;
+  background: var(--cyan);
+  box-shadow: 0 10px 30px -10px rgba(34, 229, 139, 0.55);
+}
+
+.btn.main:hover {
+  filter: brightness(1.07);
+  box-shadow: 0 14px 34px -10px rgba(34, 229, 139, 0.72);
+}
+
+#brand img.wm {
+  height: 17px;
+  width: auto;
+}

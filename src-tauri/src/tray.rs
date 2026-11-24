@@ -12,7 +12,7 @@ use tauri::{AppHandle, Emitter, Manager};
 static WORDS: RwLock<Option<HashMap<String, String>>> = RwLock::new(None);
 
 fn word(key: &str) -> String {
-    WORDS.read().unwrap().as_ref().and_then(|w| w.get(key).cloned()).unwrap_or_else(|| key.to_string())
+    WORDS.read().unwrap().as_ref().and_then(|w| w.get(key).cloned()).unwrap_or_else(|| key.to_string()).replace("RecompLauncher", "ZBOX")
 }
 
 /// Quit from inside the window (Big Picture's way out on Home), the same as the tray's Quit: it
@@ -82,7 +82,7 @@ pub fn start(app: &AppHandle) -> tauri::Result<()> {
         }
     }
     b.icon(icon)
-        .tooltip("RecompLauncher")
+        .tooltip("ZBOX")
         .menu(&menu(app)?)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, ev| picked(app, ev.id().as_ref()))
