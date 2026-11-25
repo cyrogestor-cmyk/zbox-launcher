@@ -65,7 +65,7 @@ the launcher: the server only answers on 127.0.0.1.
 | `ui_eval` | Runs JavaScript in the window, for checks the other tools can't make |
 | `read_logs` | The launcher's trail, a game's output from its last start, or the window's console errors |
 | `recent_events` | What the launcher told the window: download progress, setups, games starting and closing, messages |
-| `screenshot` | A picture of the window, or of the whole screen (Windows only) |
+| `screenshot` | A picture of the part of the screen where the window is (anything covering it shows too), or of the whole screen (Windows only) |
 | `launcher_window` | Shows and focuses the window, or minimizes it |
 
 A good loop for an agent: `ui_snapshot`, act with `ui_click` or `controller_press`, then
@@ -77,6 +77,9 @@ A good loop for an agent: `ui_snapshot`, act with `ui_click` or `controller_pres
   change. Use a test PC or VM, and an account made for testing.
 - Anyone who has the token and can reach 127.0.0.1 on that PC can control the launcher while it
   runs. Web pages are refused, even with the token. Don't reuse a token you use anywhere else.
+- Games and tools the launcher starts never see the token: it takes both variables out of its own
+  environment as it starts. Only its own start again without Steam's libraries (Linux) keeps test
+  control; after an update's restart it's off until you start the launcher with the token again.
 - Turning it off: close the launcher and start it again without the variable.
 
 ## How it's put together

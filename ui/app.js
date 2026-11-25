@@ -2137,7 +2137,23 @@ function showSlide(i) {
 // (another app on top, the launcher behind a game) leaves it still, so an idle launcher draws no
 // frames. Minimized/hidden is already handled by S.away and document.hidden.
 const windowInFront = () => !document.hidden && document.hasFocus();
-const markWindowFocus = () => document.body.classList.toggle('unfocused', !windowInFront());
+// While nothing moves (app.css pauses every animation), one that would end is put at its end: a
+// page drawn now (a download finishing, Home's list coming in) would otherwise stay on its first
+// frame, invisible, until the window is clicked. Looping ones (spinners, the hero) stay paused.
+const stillNow = () => document.body.classList.contains('unfocused') || document.body.classList.contains('away');
+function settleAnims() {
+  if (!stillNow() || !document.getAnimations) return;
+  for (const a of document.getAnimations()) {
+    const end = a.effect && a.effect.getComputedTiming().endTime;
+    if (Number.isFinite(end) && a.playState !== 'finished') try { a.finish(); } catch (e) { /* can't finish: leave it */ }
+  }
+}
+let settleSoon = 0;
+const settleWatch = new MutationObserver(() => { if (!settleSoon) settleSoon = setTimeout(() => { settleSoon = 0; settleAnims(); }, 0); });
+function markStill() {
+  if (stillNow()) { settleWatch.observe(document.body, { childList: true, subtree: true }); settleAnims(); } else settleWatch.disconnect();
+}
+const markWindowFocus = () => { document.body.classList.toggle('unfocused', !windowInFront()); markStill(); };
 addEventListener('focus', markWindowFocus);
 addEventListener('blur', markWindowFocus);
 document.addEventListener('visibilitychange', markWindowFocus);
@@ -2999,9 +3015,16 @@ function runsLine(rep) {
   const sc = scoreOf(rep.counts, rep.latest), p = sc.r.pct('runs'), sub = scoreSub(sc);
   return `<div class="rv-line"><b class="runs-pct ${scoreTone(p)}">${esc(tf('{pct}%', { pct: p }))}</b><div class="rv-what"><span>${esc(scoreOfWhat(sc))}</span>${sub ? `<small>${esc(sub)}</small>` : ''}</div>${runBar(sc.r)}</div>`;
 }
+// The score for All Reviews' chip: this version's reviews, or every version's. Without the chip's
+// say, the numbers and rows were this version's while All Versions was picked.
+function scoreFor(sc, only) {
+  const mine = sc.cur ? sc.r : sc.l;
+  if (only && mine) return { r: mine, cur: true, v: sc.v, all: sc.all };
+  return { r: sc.all, cur: false, v: sc.v, l: mine, all: sc.all };
+}
 // In All Reviews: the score big, in its color, with the rows beside it, and how many played through Proton.
-function runsSummary(rep, pickV) {
-  const sc = scoreOf(rep.counts, rep.latest), r = sc.r, sub = scoreSub(sc);
+function runsSummary(rep, pickV, only) {
+  const sc = scoreFor(scoreOf(rep.counts, rep.latest), only), r = sc.r, sub = scoreSub(sc);
   // Reviews from Linux or a Steam Deck on a Windows build: played through Proton.
   const pxc = rep.proton_counts || (rep.items || []).filter(viaPx).reduce((c, x) => Object.assign(c, { [x.verdict]: (c[x.verdict] || 0) + 1 }), {});
   const px = runTally(pxc);
@@ -3043,7 +3066,8 @@ function reviewsModal(id, verdict) {
   // A review is about the project, so the window has its name, not the game's (Show Game Names).
   const name = (a._name !== undefined ? a._name : a.name) || id;
   const sc = scoreOf(rep.counts, rep.latest), all = sc.all, items = rep.items;
-  let pickV = verdict || '', only = false;
+  // It opens on the reviews the game page's score is from: this version's, once it has enough.
+  let pickV = verdict || '', only = sc.cur;
   const list = () => {
     const shown = items.filter((x) => (!only || verNorm(x.version) === verNorm(sc.v)) && (!pickV || x.verdict === pickV));
     if (shown.length) return shown.map(repItem).join('');
@@ -3053,15 +3077,14 @@ function reviewsModal(id, verdict) {
   const site = SITE + '/game/' + encodeURIComponent(id);
   const restNote = all.n > items.length ? `<p class="rva-rest">${esc(tf('The newest {n} are here. The rest are on recomplauncher.com.', { n: fmtNum(items.length) }))}</p>` : '';
   const html = `<div class="rva-h"><div><small>${esc(tn(all.n, '1 review', '{n} reviews'))}</small><h2>${esc(name)}</h2></div><button type="button" class="rva-x" data-x="no" aria-label="${esc(t('Close'))}">${XMARK}</button></div>
-    <div class="rva-top">${runsSummary(rep, pickV)}<div class="rva-chips">${chips()}</div></div>
+    <div class="rva-top">${runsSummary(rep, pickV, only)}<div class="rva-chips">${chips()}</div></div>
     <div class="rva-list reps">${list()}</div>
     <div class="rva-foot">${restNote}<button type="button" class="btn" data-url="${esc(site)}">${esc(t('On recomplauncher.com'))}</button></div>`;
   const s = modal(html, (x) => {
     if (x.dataset.x === 'v') pickV = pickV === x.dataset.v ? '' : x.dataset.v;
     else if (x.dataset.x === 'only') only = !!x.dataset.on;
     else return;
-    $('.rv-dist', s).outerHTML = runRows(sc.r, pickV);
-    $('.rva-chips', s).innerHTML = chips();
+    $('.rva-top', s).innerHTML = `${runsSummary(rep, pickV, only)}<div class="rva-chips">${chips()}</div>`;
     const box = $('.rva-list', s);
     box.innerHTML = list();
     box.scrollTop = 0;
@@ -6294,7 +6317,9 @@ async function toggleHold(id) {
   if (on) hold.add(id); else hold.delete(id);
   await saveUi({ hold_updates: [...hold] }, true);
   if (on && S.updates[id]) { (S.held = S.held || {})[id] = S.updates[id]; delete S.updates[id]; }
-  if (!on && (S.held || {})[id]) { S.updates[id] = S.held[id]; delete S.held[id]; }
+  // A paused update was found for the install the game had then. One installed, picked or rolled
+  // back since makes it stale; the next check finds the right one.
+  if (!on && (S.held || {})[id]) { if (stillChecked(id, (S.updBasis || {})[id])) S.updates[id] = S.held[id]; delete S.held[id]; }
   const name = (S.library[id] || {}).name || id;
   toast(on ? tf('{name} stays on the version it has.', { name }) : tf('{name} gets updates again.', { name }));
   renderSide();
@@ -6351,23 +6376,38 @@ function afterCatalog() {
   updateCheckRevision++;
   return checkUpdates();
 }
+// Whether a game is still the install an update check looked at (was: the game then, with the
+// download it had started), so that check's answer still applies to it.
+function stillChecked(id, was) {
+  const g = S.library[id];
+  if (!g || !was || g.local || g.pinned || g.installer_setup) return false;
+  // A download started since shows here at once. One that's done shows in the keys below: every
+  // download writes a new install record, with a new updated_at.
+  if (was.download !== (S.dlArgs || {})[id]) return false;
+  return ['repo', 'path', 'tag', 'installed_at', 'updated_at'].every((key) => g[key] === was[key]);
+}
 async function checkUpdates(loud) {
   const revision = updateCheckRevision;
+  // A release chosen while this check waits takes priority, even before its library refresh arrives.
+  const checked = Object.fromEntries(Object.entries(S.library).map(([id, g]) => [id, { ...g, download: (S.dlArgs || {})[id] }]));
   try {
     const updates = await invoke('check_updates', { force: !!loud });
     if (revision !== updateCheckRevision) return false;
     // A version the player chose to skip (its download kept failing) stays out until a newer one.
     const skip = (S.settings.ui || {}).skip_ver || {};
     // A game whose downloaded installer waits for Set Up has its update already: Set Up runs it.
-    S.updates = Object.fromEntries(Object.entries(updates).filter(([id, tag]) => S.library[id] && !S.library[id].local && !S.library[id].installer_setup && skip[id] !== tag));
+    S.updates = Object.fromEntries(Object.entries(updates).filter(([id, tag]) => skip[id] !== tag && stillChecked(id, checked[id])));
+    // Kept for Resume Updates, which checks a paused update still fits the game.
+    S.updBasis = checked;
     holdUpdates();
     S.updInfo = {};
   } catch (e) { if (loud) fail(e); return false; }
   renderSide();
   if (window.tvRefresh && document.body.classList.contains('tv-on')) window.tvRefresh();
   if (S.view === 'downloads') render(true);
-  // Never on its own to a version the site found crashing for a lot of players.
-  const auto = Object.keys(S.updates).filter((id) => autoUpdates(id) && !S.running.has(id) && !S.jobs[id] && !(S.paused || {})[id] && !badVersion(byId(id), S.updates[id]));
+  // Never on its own to a version the site found crashing for a lot of players, nor into a game
+  // that's being uninstalled.
+  const auto = Object.keys(S.updates).filter((id) => autoUpdates(id) && !S.running.has(id) && !S.jobs[id] && !S.uninstalling.has(parentId(id)) && !(S.paused || {})[id] && !badVersion(byId(id), S.updates[id]));
   for (const id of auto) updateGame(id);
   if (auto.length) toast(updatingLine(auto));
   const waiting = Object.keys(S.updates).filter((k) => !auto.includes(k));
@@ -7457,6 +7497,8 @@ async function startInstall(id, dir, tag, anyway) {
 // version goes to the one the store let out, which isn't always it (#393). One that builds right
 // after it downloads waits while another such update downloads or builds (pumpUpdates).
 function updateGame(id) {
+  // Its folder is being deleted: an update waiting its turn (pumpUpdates) mustn't download into it.
+  if (S.uninstalling.has(parentId(id))) return Promise.resolve();
   const go = () => startInstall(id, undefined, S.updates[parentId(id)] || undefined);
   if (!buildsAfterUpdate(id) || S.jobs[id]) return go();
   if (updateChainBusy()) {
@@ -7835,20 +7877,32 @@ function updateFailedModal(f) {
   }, t('The Update Didn\'t Install'));
 }
 // `win`: the update window it was started from, which shows the download in its own button;
-// without one, a toast says it started.
+// without one, a toast says it started. True when the download went to the browser instead
+// ("opened": a Mac run from the disk image, a Linux package, a link the launcher doesn't trust), so
+// the window can close. Any other success means the launcher is quitting to install it: the window
+// stays busy until it's gone, so Update Now can't start a second one meanwhile.
 async function selfUpdate(win) {
-  if (S.selfUpdating) return;
+  if (S.selfUpdating) return false;
   S.selfUpdating = true;
-  if (!win) toast(t('Downloading the new RecompLauncher…'));
+  const busyMsg = t('Downloading the new RecompLauncher…');
+  if (!win) toast(busyMsg);
+  let r;
   try {
-    if (S.os === 'linux') await invoke('update_launcher', { bigPicture: document.body.classList.contains('tv-on') });
-    else await invoke('update_launcher');
+    if (S.os === 'linux') r = await invoke('update_launcher', { bigPicture: document.body.classList.contains('tv-on') });
+    else r = await invoke('update_launcher');
   } catch (e) {
+    S.selfUpdating = false;
     if (win) updWinReset(win);
     if (!blocked('', e) && !cantReplace(e)) fail(e);
     lookForLauncher();
+    return false;
   }
-  finally { S.selfUpdating = false; }
+  if (r !== 'opened') return false;
+  S.selfUpdating = false;
+  // Without a window (Big Picture, Downloads), "Downloading…" was already up and isn't true now.
+  for (const el of document.querySelectorAll('#toasts .toast')) if (el.dataset.msg === busyMsg) el.remove();
+  toast(t('The download page opened in your browser.'));
+  return true;
 }
 // The AppImage sits in a folder this account can't change, so it can't update itself in place.
 // Say where and why, and offer the new AppImage to download instead of a bare error.
@@ -8288,7 +8342,7 @@ function updateStart(v, opts = {}) {
   const busy = () => el.classList.contains('busy');
   const key = (e) => { if (e.key === 'Escape' && !v.required && !busy()) { e.preventDefault(); e.stopPropagation(); putOff(); } };
   document.addEventListener('keydown', key, true);
-  const go = () => { updWinStart(el, v); selfUpdate(el); };
+  const go = () => updWinGo(el, v, close);
   el.addEventListener('click', (e) => {
     const b = e.target.closest('[data-x]');
     if (!b || busy()) return;
@@ -8302,6 +8356,11 @@ function updateStart(v, opts = {}) {
   });
   if (opts.auto) return go();
   setTimeout(() => { const b = $('[data-x="now"]', el); if (b) b.focus(); }, 50);
+}
+// Update Now: the window shows the download, and closes when the browser took it instead.
+async function updWinGo(el, v, close) {
+  updWinStart(el, v);
+  if (await selfUpdate(el)) close();
 }
 // Update Now pressed: the bar says it's downloading and the button becomes the progress bar.
 function updWinStart(el, v) {
@@ -10428,6 +10487,8 @@ T.event.listen('install', ({ payload: p }) => {
     const wasInstalled = !!S.library[id];
     if (p.phase === 'done') {
       delete S.updates[id]; delete S.mods[id]; delete S.setup[id]; loadNews();
+      // A paused update was for the version this download replaced.
+      if (S.held) delete S.held[id];
       // Switched to a better version: once it's in, the old one is offered for uninstall.
       if ((((S.settings.ui || {}).switch_from) || {})[id]) refreshState().then(() => betterDone(id));
       // A game the launcher sets up: straight on to its copy, unless it already has one.
@@ -10674,7 +10735,7 @@ T.event.listen('tray', ({ payload: p }) => {
   go(view);
 });
 // Out of sight (minimized, or closed to the clock): animations and timers rest until it's back.
-T.event.listen('away', ({ payload: away }) => { S.away = !!away; document.body.classList.toggle('away', S.away); });
+T.event.listen('away', ({ payload: away }) => { S.away = !!away; document.body.classList.toggle('away', S.away); markStill(); });
 T.event.listen('new-recomp', () => loadOwned().then(() => render(true)));
 T.event.listen('screenshot', ({ payload: p }) => { delete S.shots[p.id]; forgetLooks(p.id); if (S.view === 'game' && S.arg === p.id) loadShots(p.id); });
 
